@@ -196,5 +196,3 @@ function LoadTest() {
   );
 }
 
-// Minimal hidden Input import suppression
-void Input;
