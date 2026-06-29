@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, X, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,7 +41,6 @@ function QuizScreen() {
   const navigate = useNavigate();
   const [active, setActive] = useState<ActiveSession | null>(null);
   const [now, setNow] = useState(Date.now());
-  const [reveal, setReveal] = useState(false);
 
   useEffect(() => {
     const a = loadActive();
@@ -50,8 +49,6 @@ function QuizScreen() {
       return;
     }
     setActive(a);
-    // existing answer for current index?
-    setReveal(Boolean(a.answers[a.currentIndex]));
   }, [navigate]);
 
   useEffect(() => {
@@ -81,7 +78,7 @@ function QuizScreen() {
 
   const select = useCallback(
     (choiceIdx: number) => {
-      if (!active || reveal) return;
+      if (!active) return;
       const q = active.set.questions[active.currentIndex];
       const correct = choiceIdx === q.answer;
       const record: AnswerRecord = {
@@ -92,12 +89,17 @@ function QuizScreen() {
       };
       const answers = [...active.answers];
       answers[active.currentIndex] = record;
-      const next = { ...active, answers };
+      const last = active.currentIndex >= active.set.questions.length - 1;
+      const next = {
+        ...active,
+        answers,
+        currentIndex: last ? active.currentIndex : active.currentIndex + 1,
+      };
       setActive(next);
       saveActive(next);
-      setReveal(true);
+      if (last) finish(next);
     },
-    [active, reveal],
+    [active, finish],
   );
 
   const goNext = useCallback(() => {
@@ -110,7 +112,6 @@ function QuizScreen() {
     const next = { ...active, currentIndex: active.currentIndex + 1 };
     setActive(next);
     saveActive(next);
-    setReveal(Boolean(next.answers[next.currentIndex]));
   }, [active, finish]);
 
   const goPrev = useCallback(() => {
@@ -118,7 +119,6 @@ function QuizScreen() {
     const next = { ...active, currentIndex: active.currentIndex - 1 };
     setActive(next);
     saveActive(next);
-    setReveal(Boolean(next.answers[next.currentIndex]));
   }, [active]);
 
   useEffect(() => {
@@ -128,15 +128,15 @@ function QuizScreen() {
         const idx = parseInt(e.key, 10) - 1;
         const q = active.set.questions[active.currentIndex];
         if (idx < q.options.length) select(idx);
-      } else if (e.key === "Enter" || e.key === "ArrowRight") {
-        if (reveal) goNext();
+      } else if (e.key === "ArrowRight") {
+        goNext();
       } else if (e.key === "ArrowLeft") {
         goPrev();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, reveal, select, goNext, goPrev]);
+  }, [active, select, goNext, goPrev]);
 
   if (!active) return null;
 
@@ -144,7 +144,6 @@ function QuizScreen() {
   const record = active.answers[active.currentIndex];
   const total = active.set.questions.length;
   const answered = active.answers.filter(Boolean).length;
-  const correctCount = active.answers.filter((a) => a?.correct).length;
   const progress = ((active.currentIndex + 1) / total) * 100;
   const lowTime = timeLeft <= 30 && active.durationSec > 0;
 
@@ -162,8 +161,8 @@ function QuizScreen() {
           <div className={`flex items-center gap-1.5 tabular-nums ${lowTime ? "text-hanko" : "text-muted-foreground"}`}>
             <Clock className="h-4 w-4" /> {fmtTime(timeLeft)}
           </div>
-          <div className="text-muted-foreground">
-            Score <span className="font-display tabular-nums text-foreground">{correctCount}</span>/<span className="tabular-nums">{answered}</span>
+          <div className="text-muted-foreground tabular-nums">
+            Answered {answered}/{total}
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -208,44 +207,25 @@ function QuizScreen() {
 
         <div className="mt-8 space-y-3">
           {q.options.map((opt, idx) => {
-            const isCorrect = idx === q.answer;
             const isSelected = record?.selected === idx;
-            const showCorrect = reveal && isCorrect;
-            const showWrong = reveal && isSelected && !isCorrect;
             const baseClasses =
-              "group flex w-full items-center gap-4 rounded-md border bg-background p-4 text-left transition-all hover:border-hanko/40 disabled:cursor-not-allowed disabled:opacity-100";
-            const stateClasses = showCorrect
-              ? "border-ink bg-paper-soft"
-              : showWrong
-                ? "border-hanko bg-hanko/5"
-                : isSelected
-                  ? "border-hanko/50"
-                  : "border-border";
+              "group flex w-full items-center gap-4 rounded-md border bg-background p-4 text-left transition-all hover:border-hanko/40";
+            const stateClasses = isSelected ? "border-hanko bg-hanko/5" : "border-border";
 
             return (
               <button
                 key={idx}
                 onClick={() => select(idx)}
-                disabled={reveal}
                 className={`${baseClasses} ${stateClasses}`}
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-border bg-muted font-display text-xs font-medium text-muted-foreground">
                   {idx + 1}
                 </span>
                 <span className="jp flex-1 text-base">{opt}</span>
-                {showCorrect && <Check className="h-5 w-5 text-ink" />}
-                {showWrong && <X className="h-5 w-5 text-hanko" />}
               </button>
             );
           })}
         </div>
-
-        {reveal && q.explanation && (
-          <div className="mt-6 rounded-md border-l-2 border-hanko bg-paper-soft/60 p-4">
-            <div className="mb-1 font-display text-xs uppercase tracking-wider text-hanko">Explanation</div>
-            <div className="jp text-sm leading-relaxed">{q.explanation}</div>
-          </div>
-        )}
       </Card>
 
       {/* Nav */}
@@ -254,10 +234,10 @@ function QuizScreen() {
           <ChevronLeft className="mr-1 h-4 w-4" /> Previous
         </Button>
         <div className="text-xs text-muted-foreground">
-          Press <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">1–{q.options.length}</kbd> to answer, <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">Enter</kbd> to continue
+          Press <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px]">1–{q.options.length}</kbd> to answer
         </div>
-        <Button onClick={goNext} disabled={!reveal} className="bg-hanko text-paper hover:bg-hanko/90 disabled:bg-muted disabled:text-muted-foreground">
-          {active.currentIndex >= total - 1 ? "Finish" : "Next"} <ChevronRight className="ml-1 h-4 w-4" />
+        <Button onClick={goNext} className="bg-hanko text-paper hover:bg-hanko/90">
+          {active.currentIndex >= total - 1 ? "Finish" : "Skip"} <ChevronRight className="ml-1 h-4 w-4" />
         </Button>
       </div>
     </div>

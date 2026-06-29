@@ -6,8 +6,9 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { loadLastResult, loadSessions } from "@/lib/quiz-store";
-import type { SessionResult } from "@/lib/quiz-types";
+import type { Question, SessionResult } from "@/lib/quiz-types";
 import { TYPE_LABELS } from "@/lib/quiz-types";
 
 export const Route = createFileRoute("/results")({
@@ -94,67 +95,108 @@ function ResultsScreen() {
       </Card>
 
       {/* Review */}
-      <Card className="mt-8">
-        <CardHeader>
-          <CardTitle className="font-display">Review</CardTitle>
-          <CardDescription>Every question, your answer, and the explanation.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {result.questions.map((q, i) => {
-            const a = result.answers[i];
-            const correct = a?.correct ?? false;
-            return (
-              <div key={`${q.id}-${i}`} className="rounded-md border bg-card p-5">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="font-display text-[10px]">#{i + 1}</Badge>
-                    <span>{TYPE_LABELS[q.type] ?? q.type}</span>
-                  </div>
-                  {correct ? (
-                    <span className="inline-flex items-center gap-1 text-xs text-ink">
-                      <Check className="h-3.5 w-3.5" /> Correct
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-xs text-hanko">
-                      <X className="h-3.5 w-3.5" /> {a?.selected == null ? "Skipped" : "Wrong"}
-                    </span>
-                  )}
-                </div>
-                <div className="jp font-display text-lg">{q.question}</div>
-                {q.reading && <div className="jp mt-1 text-xs text-muted-foreground">{q.reading}</div>}
-                <ul className="mt-3 space-y-1.5 text-sm">
-                  {q.options.map((opt, idx) => {
-                    const isCorrect = idx === q.answer;
-                    const isPicked = a?.selected === idx;
-                    return (
-                      <li
-                        key={idx}
-                        className={`flex items-center gap-2 rounded px-2 py-1 ${
-                          isCorrect
-                            ? "bg-paper-soft text-foreground"
-                            : isPicked
-                              ? "bg-hanko/10 text-hanko"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        <span className="font-mono text-xs opacity-70">{idx + 1}.</span>
-                        <span className="jp flex-1">{opt}</span>
-                        {isCorrect && <Check className="h-3.5 w-3.5" />}
-                        {isPicked && !isCorrect && <X className="h-3.5 w-3.5" />}
-                      </li>
-                    );
-                  })}
-                </ul>
-                {q.explanation && (
-                  <div className="mt-3 border-l-2 border-hanko/60 pl-3 text-sm text-muted-foreground">
-                    {q.explanation}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+      <ReviewSection result={result} />
+    </div>
+  );
+}
+
+function ReviewSection({ result }: { result: SessionResult }) {
+  const items = result.questions.map((q, i) => ({ q, a: result.answers[i], i }));
+  const wrong = items.filter(({ a }) => !a?.correct);
+  const correctItems = items.filter(({ a }) => a?.correct);
+
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle className="font-display">Review</CardTitle>
+        <CardDescription>Every question, your answer, and the explanation.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="wrong">
+          <TabsList>
+            <TabsTrigger value="wrong">
+              Wrong <span className="ml-1.5 tabular-nums opacity-70">{wrong.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="correct">
+              Correct <span className="ml-1.5 tabular-nums opacity-70">{correctItems.length}</span>
+            </TabsTrigger>
+            <TabsTrigger value="all">
+              All <span className="ml-1.5 tabular-nums opacity-70">{items.length}</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="wrong" className="mt-4 space-y-4">
+            {wrong.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No wrong answers — well done.</p>
+            ) : (
+              wrong.map(({ q, a, i }) => <ReviewItem key={`${q.id}-${i}`} q={q} a={a} i={i} />)
+            )}
+          </TabsContent>
+          <TabsContent value="correct" className="mt-4 space-y-4">
+            {correctItems.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No correct answers yet.</p>
+            ) : (
+              correctItems.map(({ q, a, i }) => <ReviewItem key={`${q.id}-${i}`} q={q} a={a} i={i} />)
+            )}
+          </TabsContent>
+          <TabsContent value="all" className="mt-4 space-y-4">
+            {items.map(({ q, a, i }) => <ReviewItem key={`${q.id}-${i}`} q={q} a={a} i={i} />)}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReviewItem({ q, a, i }: { q: Question; a: SessionResult["answers"][number] | undefined; i: number }) {
+  const correct = a?.correct ?? false;
+  return (
+    <div className="rounded-md border bg-card p-5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline" className="font-display text-[10px]">#{i + 1}</Badge>
+          <span>{TYPE_LABELS[q.type] ?? q.type}</span>
+        </div>
+        {correct ? (
+          <span className="inline-flex items-center gap-1 text-xs text-ink">
+            <Check className="h-3.5 w-3.5" /> Correct
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-hanko">
+            <X className="h-3.5 w-3.5" /> {a?.selected == null ? "Skipped" : "Wrong"}
+          </span>
+        )}
+      </div>
+      <div className="jp font-display text-lg">{q.question}</div>
+      {q.reading && <div className="jp mt-1 text-xs text-muted-foreground">{q.reading}</div>}
+      <ul className="mt-3 space-y-1.5 text-sm">
+        {q.options.map((opt, idx) => {
+          const isCorrect = idx === q.answer;
+          const isPicked = a?.selected === idx;
+          return (
+            <li
+              key={idx}
+              className={`flex items-center gap-2 rounded px-2 py-1 ${
+                isCorrect
+                  ? "bg-paper-soft text-foreground"
+                  : isPicked
+                    ? "bg-hanko/10 text-hanko"
+                    : "text-muted-foreground"
+              }`}
+            >
+              <span className="font-mono text-xs opacity-70">{idx + 1}.</span>
+              <span className="jp flex-1">{opt}</span>
+              {isCorrect && <Check className="h-3.5 w-3.5" />}
+              {isPicked && !isCorrect && <X className="h-3.5 w-3.5" />}
+            </li>
+          );
+        })}
+      </ul>
+      {q.explanation && (
+        <div className="mt-3 border-l-2 border-hanko/60 pl-3 text-sm text-muted-foreground">
+          {q.explanation}
+        </div>
+      )}
     </div>
   );
 }
