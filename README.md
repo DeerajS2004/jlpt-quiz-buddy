@@ -89,8 +89,10 @@ The app is wired up as a **Tauri 2** desktop shell. Tauri uses the system webvie
    bun add -d @tauri-apps/cli
    ```
 4. **Platform system deps** (see below).
-
-### Pop!_OS / Ubuntu / Debian
+5. **Generate platform icons** (one-time, from the bundled `src-tauri/icons/icon.png`):
+   ```bash
+   bun tauri icon src-tauri/icons/icon.png
+   ```
 
 ```bash
 sudo apt update
