@@ -94,6 +94,8 @@ The app is wired up as a **Tauri 2** desktop shell. Tauri uses the system webvie
    bun tauri icon src-tauri/icons/icon.png
    ```
 
+### Pop!_OS / Ubuntu / Debian
+
 ```bash
 sudo apt update
 sudo apt install -y \
