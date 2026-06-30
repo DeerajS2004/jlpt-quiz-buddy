@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, X, RotateCcw, BookOpen } from "lucide-react";
 import { z } from "zod";
 
@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CopyButton } from "@/components/copy-button";
 import { loadLastResult, loadSessions } from "@/lib/quiz-store";
-import type { Question, SessionResult } from "@/lib/quiz-types";
+import type { Question, QuestionType, SessionResult } from "@/lib/quiz-types";
 import { TYPE_LABELS } from "@/lib/quiz-types";
 
 export const Route = createFileRoute("/results")({
