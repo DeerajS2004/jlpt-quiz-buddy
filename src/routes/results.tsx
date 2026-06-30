@@ -204,3 +204,110 @@ function ReviewItem({ q, a, i }: { q: Question; a: SessionResult["answers"][numb
     </div>
   );
 }
+
+function buildSummary(result: SessionResult): string {
+  const lines: string[] = [];
+  const p = pct(result.correct, result.total);
+  lines.push(`JLPT Practice Session — ${result.title}`);
+  if (result.day) lines.push(`Day: ${result.day}`);
+  lines.push(`Date: ${new Date(result.date).toLocaleString()}`);
+  lines.push(`Duration: ${fmtDur(result.durationSec)}`);
+  lines.push(`Score: ${result.correct}/${result.total} (${p}%)`);
+  lines.push("");
+
+  // Category breakdown
+  const byCat: Record<string, { total: number; correct: number }> = {};
+  result.questions.forEach((q, i) => {
+    const key = q.type;
+    if (!byCat[key]) byCat[key] = { total: 0, correct: 0 };
+    byCat[key].total += 1;
+    if (result.answers[i]?.correct) byCat[key].correct += 1;
+  });
+  lines.push("Category breakdown:");
+  Object.entries(byCat).forEach(([cat, s]) => {
+    lines.push(`- ${TYPE_LABELS[cat as QuestionType] ?? cat}: ${s.correct}/${s.total} (${pct(s.correct, s.total)}%)`);
+  });
+  lines.push("");
+
+  lines.push("Questions & answers:");
+  result.questions.forEach((q, i) => {
+    const a = result.answers[i];
+    const status = a?.correct ? "CORRECT" : a?.selected == null ? "SKIPPED" : "WRONG";
+    const cat = TYPE_LABELS[q.type] ?? q.type;
+    lines.push("");
+    lines.push(`Q${i + 1}. [${cat}] [${status}]`);
+    lines.push(`Prompt: ${q.question}`);
+    if (q.reading) lines.push(`Reading: ${q.reading}`);
+    q.options.forEach((opt, idx) => {
+      const marks: string[] = [];
+      if (idx === q.answer) marks.push("correct");
+      if (a?.selected === idx) marks.push("my answer");
+      const tag = marks.length ? ` (${marks.join(", ")})` : "";
+      lines.push(`  ${idx + 1}. ${opt}${tag}`);
+    });
+    if (a?.selected == null) lines.push("My answer: (skipped)");
+    if (q.explanation) lines.push(`Explanation: ${q.explanation}`);
+  });
+
+  lines.push("");
+  lines.push("Please help me understand the questions I got wrong, explain the underlying grammar/vocabulary/kanji, and suggest practice exercises to strengthen my weak areas.");
+  return lines.join("\n");
+}
+
+function SummarySection({ result }: { result: SessionResult }) {
+  const summary = useMemo(() => buildSummary(result), [result]);
+  const wrongCount = result.answers.filter((a) => !a?.correct).length;
+
+  // Category stats
+  const byCat = useMemo(() => {
+    const m: Record<string, { total: number; correct: number }> = {};
+    result.questions.forEach((q, i) => {
+      const key = q.type;
+      if (!m[key]) m[key] = { total: 0, correct: 0 };
+      m[key].total += 1;
+      if (result.answers[i]?.correct) m[key].correct += 1;
+    });
+    return m;
+  }, [result]);
+
+  return (
+    <Card className="mt-8">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div>
+          <CardTitle className="font-display">Summary</CardTitle>
+          <CardDescription>
+            Copy this and paste into an AI chat to get a tailored study plan.
+          </CardDescription>
+        </div>
+        <CopyButton value={summary} label="Copy summary" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(byCat).map(([cat, s]) => (
+            <div key={cat} className="rounded-md border bg-paper-soft px-3 py-2 text-sm">
+              <div className="font-display text-xs uppercase tracking-wider text-muted-foreground">
+                {TYPE_LABELS[cat as QuestionType] ?? cat}
+              </div>
+              <div className="mt-1 flex items-baseline justify-between">
+                <span className="tabular-nums">
+                  {s.correct}/{s.total}
+                </span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {pct(s.correct, s.total)}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <details className="rounded-md border bg-card">
+          <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
+            Preview summary text ({wrongCount} wrong of {result.total})
+          </summary>
+          <pre className="max-h-96 overflow-auto border-t bg-paper-soft p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-foreground">
+            {summary}
+          </pre>
+        </details>
+      </CardContent>
+    </Card>
+  );
+}
