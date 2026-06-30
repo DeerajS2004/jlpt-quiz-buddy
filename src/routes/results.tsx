@@ -95,6 +95,9 @@ function ResultsScreen() {
         </CardContent>
       </Card>
 
+      {/* Summary (copyable) */}
+      <SummarySection result={result} />
+
       {/* Review */}
       <ReviewSection result={result} />
     </div>
