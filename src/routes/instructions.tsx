@@ -85,11 +85,17 @@ const SECTION_SAMPLES: Record<string, string> = {
 }`,
 };
 
-function Code({ children }: { children: React.ReactNode }) {
+function Code({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-md border bg-paper-soft p-4 font-mono text-xs leading-relaxed text-foreground">
-      <code>{children}</code>
-    </pre>
+    <div className="relative">
+      <pre className="overflow-x-auto rounded-md border bg-paper-soft p-4 pr-14 font-mono text-xs leading-relaxed text-foreground">
+        <code>{children}</code>
+      </pre>
+      <CopyButton
+        value={children}
+        className="absolute right-2 top-2 h-7 px-2 bg-background/80 backdrop-blur"
+      />
+    </div>
   );
 }
 
