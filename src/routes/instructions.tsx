@@ -4,6 +4,7 @@ import { BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/copy-button";
 import { TYPE_LABELS, QUESTION_TYPES } from "@/lib/quiz-types";
 
 export const Route = createFileRoute("/instructions")({
@@ -84,11 +85,17 @@ const SECTION_SAMPLES: Record<string, string> = {
 }`,
 };
 
-function Code({ children }: { children: React.ReactNode }) {
+function Code({ children }: { children: string }) {
   return (
-    <pre className="overflow-x-auto rounded-md border bg-paper-soft p-4 font-mono text-xs leading-relaxed text-foreground">
-      <code>{children}</code>
-    </pre>
+    <div className="relative">
+      <pre className="overflow-x-auto rounded-md border bg-paper-soft p-4 pr-14 font-mono text-xs leading-relaxed text-foreground">
+        <code>{children}</code>
+      </pre>
+      <CopyButton
+        value={children}
+        className="absolute right-2 top-2 h-7 px-2 bg-background/80 backdrop-blur"
+      />
+    </div>
   );
 }
 
