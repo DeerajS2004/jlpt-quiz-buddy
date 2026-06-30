@@ -4,6 +4,7 @@ import { BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/copy-button";
 import { TYPE_LABELS, QUESTION_TYPES } from "@/lib/quiz-types";
 
 export const Route = createFileRoute("/instructions")({
