@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "sdk_version": "0.24.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "jlpt-practice-mcp",
+      "version": "0.1.0",
+      "title": "JLPT Practice MCP"
+    },
+    "tools": [
+      {
+        "name": "list_quizzes",
+        "title": "List bundled JLPT quizzes",
+        "description": "List every JLPT quiz that ships with the app, with its id, title, description, and question count. Use the returned id with get_quiz to fetch the full question set.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_quiz",
+        "title": "Get a bundled JLPT quiz",
+        "description": "Return the full question set for a bundled JLPT quiz, including every question's prompt, reading, options, correct answer index, and explanation. Call list_quizzes first to discover valid ids.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Quiz id from list_quizzes, e.g. 'n5-kanji'."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
