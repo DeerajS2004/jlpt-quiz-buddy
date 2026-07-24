@@ -162,6 +162,24 @@ Run the generated `.msi` (or `.exe`) from `src-tauri/target/release/bundle/`. Th
 
 ---
 
+## Releases via GitHub Actions (Linux)
+
+The repo ships with `.github/workflows/release.yml`, which builds Linux installers on GitHub's cloud runners and attaches them to a GitHub Release. Handy if you're developing on macOS/Windows but installing on Pop!_OS.
+
+**Trigger:** push a version tag matching `v*`.
+
+```bash
+# bump versions in package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+The workflow runs on `ubuntu-22.04` (matches Pop!_OS 22.04's glibc), installs the Tauri system deps, runs `bun install` + `bun run build`, then uses `tauri-apps/tauri-action` to build and publish. When it finishes, the repo's **Releases** page has `.deb` and `.AppImage` files ready to download.
+
+No secrets to configure — the workflow uses the auto-provisioned `GITHUB_TOKEN`. Make sure `src-tauri/icons/` is committed (run `bun tauri icon src-tauri/icons/icon.png` once locally) so the runner has platform icons to bundle.
+
+---
+
 ## Project layout
 
 ```
