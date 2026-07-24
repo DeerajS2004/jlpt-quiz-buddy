@@ -28,6 +28,12 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
+      - name: Debug icon file
+        run: |
+          file src-tauri/icons/icon.png
+          ls -la src-tauri/icons/
+          head -c 16 src-tauri/icons/icon.png | xxd
+          
       - name: Install Tauri system dependencies
         run: |
           sudo apt-get update
