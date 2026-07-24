@@ -1,52 +1,58 @@
-- What we're building
+## Goal
 
-A focused, anonymous JLPT practice quiz covering levels N5 through N1. Three question modes: vocabulary meaning, kanji reading, and grammar fill-in-the-blank. No accounts — sessions are local only.
+Automate Linux desktop builds for the JLPT Practice Tauri app using GitHub Actions. Pushing a `v*` tag (e.g. `v0.1.0`) builds `.deb` and `.AppImage` installers on an Ubuntu runner and publishes them to a GitHub Release you can download onto Pop!_OS.
 
-## Visual direction
+## What gets added
 
-- **Palette:** Paper & Hanko — warm off-white background (#f5f3ee), soft paper grey (#e8e4dd), ink black (#2d2d2d), single hanko red accent (#c8302a) for the active state, correct/scoring marks, and the brand stamp.
-- **Type:** Space Grotesk for display (level badges, big Japanese prompts framing, numerals), DM Sans for body and answer choices.
-- **Layout:** Sidebar shell. Left rail holds level selector (N5–N1), question-type filter, and session progress. Main area is the quiz card — generous whitespace, large Japanese characters as the visual hero.
+**One new file:** `.github/workflows/release.yml`
 
-## Screens & flow
+**One tiny README addition:** a "Releases via GitHub Actions" subsection under the desktop-build section explaining how to cut a release with a tag.
 
-1. **Home / setup** — sidebar shows N5–N1 chips and mode toggles (Vocabulary / Kanji Reading / Grammar). Main area: short intro card, "Start quiz" button, optional question-count selector (10 / 20 / 30).
-2. **Quiz screen** — sidebar shows current level, mode, and progress bar (e.g. 7 / 20) + live score. Main area: one question card with the Japanese prompt set at large scale, 4 multiple-choice buttons stacked. Hanko-red ring on hover/focus.
-3. **Feedback state (inline)** — after answering, the chosen choice turns red (wrong) or ink-outlined (correct), correct answer is revealed with the reading/meaning, plus a small "Next" button. Keyboard: 1–4 to answer, Enter to advance.
-4. **Results** — score, accuracy %, per-question review list, "Try again" / "Change level".
+No app code changes. No changes to `src-tauri/`, `package.json`, or existing scripts.
 
-## Content / data
+## Workflow shape
 
-Ships with a hand-curated local question bank (TypeScript files, no backend) so the app works immediately:
+```text
+Trigger:  push tag matching v*
+Runner:   ubuntu-22.04   (Ubuntu 22.04 is Pop!_OS 22.04's base — .deb will install cleanly)
 
-- ~30 questions per (level × mode) to start = enough for varied 10/20-question sessions.
-- Each question: `{ id, level, mode, prompt, choices[4], answerIndex, explanation? }`.
-- Questions are shuffled per session; choices shuffled per question.
+Steps:
+  1. checkout
+  2. setup Bun (oven-sh/setup-bun)
+  3. setup Rust stable (dtolnay/rust-toolchain) + cargo cache (swatinem/rust-cache)
+  4. apt install Tauri Linux deps:
+        libwebkit2gtk-4.1-dev build-essential curl wget file
+        libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+  5. bun install --frozen-lockfile
+  6. bun run build                       # produces .output/public
+  7. bun x tauri build                   # produces .deb + .AppImage in src-tauri/target/release/bundle/
+  8. tauri-apps/tauri-action (or softprops/action-gh-release) to create a
+     GitHub Release for the tag and upload:
+        src-tauri/target/release/bundle/deb/*.deb
+        src-tauri/target/release/bundle/appimage/*.AppImage
+```
 
-The bank is structured so it's trivial to extend later — one file per level per mode under `src/data/questions/`.
+Uses `GITHUB_TOKEN` (auto-provided) for release upload — no secrets to configure.
 
-## Routes
+## Release flow for you
 
-- `/` — setup/home (level + mode + start)
-- `/quiz` — active quiz (session held in a Zustand-style store or React context; if user lands here without a session, redirect to `/`)
-- `/results` — end-of-quiz summary
+```bash
+# bump version in package.json + src-tauri/tauri.conf.json + src-tauri/Cargo.toml, then:
+git tag v0.1.1
+git push origin v0.1.1
+```
 
-Shared sidebar lives in `__root.tsx` via shadcn `SidebarProvider`.
+Actions tab shows the build; when it finishes, the Releases page has `.deb` and `.AppImage` attached, ready to download and install on Pop!_OS.
 
-## Technical details
+## Notes / choices
 
-- TanStack Start routes under `src/routes/`: `index.tsx`, `quiz.tsx`, `results.tsx`.
-- Sidebar component in `src/components/app-sidebar.tsx` using shadcn `Sidebar` with `collapsible="icon"`; `SidebarTrigger` in the header.
-- Quiz session state: a small React context (`QuizProvider`) holding `{ level, mode, questions, currentIndex, answers, score }`. No persistence required (anonymous, ephemeral).
-- Question bank: `src/data/questions/{n5,n4,n3,n2,n1}.{vocab,kanji,grammar}.ts`, aggregated by `src/data/questions/index.ts` with a `getQuestions(level, mode, count)` helper that shuffles.
-- Design tokens added to `src/styles.css` under `:root` (paper, ink, hanko-red) and mapped in `@theme inline`; Space Grotesk + DM Sans loaded via `@fontsource` packages imported in `src/start.ts` (or root).
-- shadcn components used: `Button`, `Card`, `Progress`, `Badge`, `Sidebar`, `RadioGroup` (or custom large buttons for choices).
-- Keyboard handling via a `useEffect` listener on the quiz screen.
+- **Runner: `ubuntu-22.04`** rather than `ubuntu-latest`. `ubuntu-latest` currently points at 24.04, which ships `libwebkit2gtk-4.1` linked against a newer glibc — a `.deb` built there may fail to install on Pop!_OS 22.04. 22.04 is the safe lowest common denominator; you can bump later.
+- **Action choice:** `tauri-apps/tauri-action@v0` handles build + release upload in one step and is the officially recommended path. Falls back cleanly if you ever want to add Windows/macOS runners later — just add entries to a `matrix.platform`.
+- **Icons:** the workflow assumes `src-tauri/icons/` already contains generated platform icons (the README's one-time `bun tauri icon` step). If they're missing the build will fail; easy to add a generate-icons step later if needed.
+- **No code signing** for Linux — not required for `.deb`/`.AppImage`.
 
-## Out of scope (for this build)
+## Out of scope (per your answers)
 
-- Listening questions (you marked optional — easy to add later once we wire a TTS source).
-- Accounts, saved history, spaced repetition, leaderboards.
-- Hand-writing kanji input.  
-  
-i have uploaded a directory called jlpt into the repo , look at it and follow the structure for json uploaded quizzes and storing stats and also showing answers and results are each quiz and a page where the instructions are written on how to use the app and how the json file must be structured for each section : kanji, grammar, reading...
+- Windows `.msi`/`.exe` and macOS `.dmg` builds
+- Manual `workflow_dispatch` trigger
+- Auto-updater endpoint / signed updates
