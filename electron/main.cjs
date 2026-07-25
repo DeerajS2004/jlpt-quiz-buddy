@@ -23,7 +23,10 @@ function startServer() {
     // ELECTRON_RUN_AS_NODE is required so that spawning process.execPath runs
     // this file as a plain Node script instead of launching another Electron
     // app instance (which would open a new window and recurse infinitely).
-    const env = { ...process.env, NITRO_PORT: "0", ELECTRON_RUN_AS_NODE: "1" };
+    // Fixed port (not "0"/random) so the app always runs at the same origin.
+    // Browser storage (localStorage/IndexedDB) is scoped per-origin, so a
+    // random port each launch was wiping quiz history every time.
+    const env = { ...process.env, NITRO_PORT: "47823", ELECTRON_RUN_AS_NODE: "1" };
 
     serverProcess = spawn(process.execPath, [entry], {
       env,
@@ -95,7 +98,21 @@ async function createWindow() {
   });
 }
 
-app.whenReady().then(createWindow);
+// Prevent a second copy of the app from launching and colliding on the
+// fixed port above.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+
+  app.whenReady().then(createWindow);
+}
 
 app.on("window-all-closed", () => {
   if (serverProcess) {
