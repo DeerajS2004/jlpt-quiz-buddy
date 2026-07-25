@@ -1,5 +1,8 @@
 {
   "name": "tanstack_start_ts",
+  "version": "1.0.0",
+  "description": "JLPT Practice - offline Japanese language proficiency test practice app.",
+  "author": "JLPT Practice",
   "private": true,
   "sideEffects": false,
   "type": "module",
