@@ -20,50 +20,30 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: bun install
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
+      - name: Build web app (nitro node-server)
+        run: bun run build
 
-      - name: Debug icon file
+      - name: Package Electron app (Linux x64)
         run: |
-          file src-tauri/icons/icon.png
-          ls -la src-tauri/icons/
-          head -c 16 src-tauri/icons/icon.png | xxd
-          
-      - name: Install Tauri system dependencies
+          bunx electron-packager . "JLPT Practice" \
+            --platform=linux --arch=x64 \
+            --out=electron-release --overwrite --prune=true \
+            --ignore="^/src$" \
+            --ignore="^/public$" \
+            --ignore="^/electron-release$" \
+            --ignore="^/\.github$" \
+            --ignore="^/jlpt$"
+
+      - name: Archive build
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
+          cd electron-release
+          tar czf "JLPT-Practice-linux-x64.tar.gz" "JLPT Practice-linux-x64"
 
-      - name: Install JS dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build & release (Tauri)
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "JLPT Practice ${{ github.ref_name }}"
-          releaseBody: |
-            Automated Linux build.
-
-            Downloads:
-            - `.deb` — Pop!_OS / Ubuntu / Debian (22.04+)
-            - `.AppImage` — portable, any modern Linux
-          releaseDraft: false
-          prerelease: false
-          args: ""
+          files: electron-release/JLPT-Practice-linux-x64.tar.gz
+          generate_release_notes: true
