@@ -1,97 +1,121 @@
-// Electron main process for JLPT Practice.
-// - In dev: loads http://localhost:8080 (run `bun run dev` first, or use `bun run electron:dev`).
-// - In production (packaged): spawns the built Nitro node server from `.output/server/index.mjs`
-//   on a free port and loads it. localStorage lives in Electron's per-user `userData` dir,
-//   so quiz history, stats, and streaks persist across launches and updates.
-
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
-const net = require("net");
-const http = require("http");
 
-const isDev = !app.isPackaged;
-let serverProc = null;
-let serverUrl = null;
+let mainWindow;
+let serverProcess;
 
-function findFreePort() {
+function startServer() {
   return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.unref();
-    srv.on("error", reject);
-    srv.listen(0, "127.0.0.1", () => {
-      const port = srv.address().port;
-      srv.close(() => resolve(port));
+    // Packaged app: files unpacked from the asar live under app.asar.unpacked.
+    const packedServerPath = path.join(
+      process.resourcesPath,
+      "app.asar.unpacked",
+      "dist",
+      "server",
+      "index.mjs"
+    );
+    // Unpacked development / local builds.
+    const devServerPath = path.join(__dirname, "..", "dist", "server", "index.mjs");
+    const entry = require("fs").existsSync(packedServerPath) ? packedServerPath : devServerPath;
+
+    // Use a random OS-assigned port so multiple instances don't collide.
+    // ELECTRON_RUN_AS_NODE is required so that spawning process.execPath runs
+    // this file as a plain Node script instead of launching another Electron
+    // app instance (which would open a new window and recurse infinitely).
+    const env = { ...process.env, NITRO_PORT: "0", ELECTRON_RUN_AS_NODE: "1" };
+
+    serverProcess = spawn(process.execPath, [entry], {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        reject(new Error("Timed out waiting for the SSR server to start."));
+      }
+    }, 15000);
+
+    const onData = (data) => {
+      const text = data.toString();
+      const match = text.match(/Listening on:?\s+(http:\/\/[^\s]+)/);
+      if (match && !resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        resolve(match[1]);
+      }
+    };
+
+    serverProcess.stdout.on("data", onData);
+    serverProcess.stderr.on("data", onData);
+
+    serverProcess.on("error", (err) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        reject(err);
+      }
+    });
+
+    serverProcess.on("exit", (code) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        reject(new Error(`SSR server exited early with code ${code}.`));
+      }
     });
   });
 }
 
-function waitForServer(url, timeoutMs = 15000) {
-  const start = Date.now();
-  return new Promise((resolve, reject) => {
-    const tick = () => {
-      const req = http.get(url, (res) => {
-        res.destroy();
-        resolve();
-      });
-      req.on("error", () => {
-        if (Date.now() - start > timeoutMs) return reject(new Error("server timeout"));
-        setTimeout(tick, 200);
-      });
-    };
-    tick();
-  });
-}
-
-async function startProdServer() {
-  const port = await findFreePort();
-  // In a packaged app, resources live under process.resourcesPath/app.
-  const appRoot = app.isPackaged ? path.join(process.resourcesPath, "app") : path.join(__dirname, "..");
-  const entry = path.join(appRoot, ".output", "server", "index.mjs");
-  serverProc = spawn(process.execPath, [entry], {
-    env: { ...process.env, PORT: String(port), NODE_ENV: "production", ELECTRON_RUN_AS_NODE: "1" },
-    stdio: "inherit",
-  });
-  serverProc.on("exit", (code) => {
-    console.log("[jlpt] server exited", code);
-  });
-  serverUrl = `http://127.0.0.1:${port}`;
-  await waitForServer(serverUrl);
-  return serverUrl;
-}
-
 async function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
-    height: 860,
-    minWidth: 900,
-    minHeight: 600,
-    backgroundColor: "#f5f3ee",
-    title: "JLPT Practice",
+    height: 900,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, "preload.cjs"),
     },
   });
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
+  try {
+    const serverUrl = await startServer();
+    mainWindow.loadURL(serverUrl);
+  } catch (err) {
+    console.error("Failed to start SSR server:", err);
+    mainWindow.webContents.executeJavaScript(`
+      document.body.innerHTML = '<h1>JLPT Practice</h1><p>Could not start the local server. Please try restarting the app.</p>';
+    `);
+  }
 
-  const url = isDev ? "http://localhost:8080" : await startProdServer();
-  await win.loadURL(url);
+  mainWindow.on("closed", () => {
+    mainWindow = null;
+  });
 }
 
 app.whenReady().then(createWindow);
 
 app.on("window-all-closed", () => {
-  if (serverProc) {
-    try { serverProc.kill(); } catch {}
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
   }
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (mainWindow == null) {
+    createWindow();
+  }
+});
+
+app.on("before-quit", () => {
+  if (serverProcess) {
+    serverProcess.kill();
+    serverProcess = null;
+  }
 });
