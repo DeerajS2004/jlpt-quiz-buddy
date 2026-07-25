@@ -5,16 +5,16 @@ directories:
   output: electron-release
   buildResources: build-resources
 files:
-  - dist/**/*
+  - .output/**/*
   - electron/main.cjs
   - electron/preload.cjs
   - package.json
 extraMetadata:
   main: electron/main.cjs
-# The SSR server must be spawned as a real Node process, so unpack the dist
-# folder from the asar archive so fs/paths work at runtime.
+# The SSR server must be spawned as a real Node process, so unpack the
+# .output folder from the asar archive so fs/paths work at runtime.
 asarUnpack:
-  - dist/**/*
+  - .output/**/*
 linux:
   target:
     - target: AppImage
