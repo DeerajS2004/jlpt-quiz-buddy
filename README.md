@@ -1,6 +1,6 @@
 # 🗾 JLPT Practice
 
-A calm, sidebar-driven JLPT (N5–N1) mock-test app with the hush and precision of a Japanese stationery shop. Built with **TanStack Start + React 19 + Tailwind v4**, packaged as a cross-platform desktop app with **Tauri 2**.
+A calm, sidebar-driven JLPT (N5–N1) mock-test app with the hush and precision of a Japanese stationery shop. Built with **TanStack Start + React 19 + Tailwind v4**, and packaged as a cross-platform desktop app with **Electron**.
 
 > Paper & Hanko palette · Modern Sans typography (Space Grotesk / DM Sans) · Sidebar layout
 
@@ -14,8 +14,8 @@ A calm, sidebar-driven JLPT (N5–N1) mock-test app with the hush and precision 
 - **No-spoiler quiz flow** — answers stay hidden until the end
 - **Tabbed review** — Wrong / Correct / All on the results screen, defaulting to Wrong
 - **Keyboard shortcuts** — `1–4` to pick an option, `← / →` to navigate, `Enter` to confirm
-- **Lifetime statistics** — accuracy, streaks, per-category progress bars, last-12 session history
-- **Local-only** — all progress stored in your browser/app via `localStorage`. No accounts, no cloud.
+- **Lifetime statistics** — accuracy, streaks, per-category progress bars, session history
+- **Local-only, persistent** — all progress is stored via `localStorage` in Electron's per-user data directory. History and stats stay put across app restarts and updates. No accounts, no cloud.
 
 ---
 
@@ -65,7 +65,7 @@ Open <http://localhost:8080>.
 Other handy scripts:
 
 ```bash
-bun run build        # production web build (output: .output/public)
+bun run build        # production build (nitro node-server → .output/)
 bun run preview      # serve the production build
 bun run lint
 bun run format
@@ -73,110 +73,77 @@ bun run format
 
 ---
 
-## Run as a desktop app (Tauri)
+## Run as a desktop app (Electron)
 
-The app is wired up as a **Tauri 2** desktop shell. Tauri uses the system webview (WebKitGTK on Linux, WebView2 on Windows, WKWebView on macOS), so installers stay small (~10–15 MB) and start instantly.
+The app is wired up as an **Electron** desktop shell. The Electron main process lives at `electron/main.cjs`:
 
-### One-time prerequisites
+- **In dev**, it loads `http://localhost:8080` (the Vite dev server) — full hot reload.
+- **In a packaged build**, it spawns the built Nitro node server (`.output/server/index.mjs`) on a free localhost port and points the window at it. This keeps every route working, including the MCP endpoints.
 
-1. **Node + Bun** — already required for the web app.
-2. **Rust toolchain** — install via [rustup](https://rustup.rs):
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
-3. **Tauri CLI**:
-   ```bash
-   bun add -d @tauri-apps/cli
-   ```
-4. **Platform system deps** (see below).
-5. **Generate platform icons** (one-time, from the bundled `src-tauri/icons/icon.png`):
-   ```bash
-   bun tauri icon src-tauri/icons/icon.png
-   ```
+Quiz history, stats, and streaks live in `localStorage`, which Electron scopes to the app's per-user `userData` directory — so your progress persists across launches and updates automatically.
 
-### Pop!_OS / Ubuntu / Debian
+### Prerequisites
 
-```bash
-sudo apt update
-sudo apt install -y \
-  libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl wget file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
-```
-
-### Windows 10/11
-
-- Install **Microsoft Visual Studio C++ Build Tools** (with the "Desktop development with C++" workload).
-- Install **WebView2 Runtime** (preinstalled on Windows 11; [download for Windows 10](https://developer.microsoft.com/microsoft-edge/webview2/)).
-
-### macOS (optional)
-
-```bash
-xcode-select --install
-```
-
----
+- **Node + Bun** — required for both the web and desktop builds.
+- **Linux system libs** — Electron on Pop!_OS / Ubuntu / Debian needs the standard GTK/graphics stack (usually already installed). If Electron fails to launch:
+  ```bash
+  sudo apt install -y libnss3 libatk-bridge2.0-0 libgtk-3-0 libgbm1 libasound2
+  ```
 
 ### Develop the desktop app
 
 ```bash
-bun run tauri:dev
+bun run electron:dev
 ```
 
-This runs `bun run dev` in the background and opens the app in a native window pointed at `http://localhost:8080`. Hot reload works exactly like the browser.
+This starts `bun run dev` and, once the dev server responds on port 8080, opens the Electron window pointing at it. Edits hot-reload just like in the browser.
 
-### Build installers
+### Build a desktop package (Linux)
 
 ```bash
-bun run tauri:build
+bun run electron:build
 ```
 
-Output lands in `src-tauri/target/release/bundle/`:
-
-| Platform | Artifacts |
-| -------- | --------- |
-| **Linux**   | `.deb` (Pop!_OS / Ubuntu / Debian), `.rpm` (Fedora), `.AppImage` (portable) |
-| **Windows** | `.msi` and `.exe` (NSIS) installers |
-| **macOS**   | `.app` bundle and `.dmg` |
-
-#### Install on Pop!_OS
+Output lands in `electron-release/JLPT Practice-linux-x64/`. Launch it directly:
 
 ```bash
-sudo dpkg -i src-tauri/target/release/bundle/deb/jlpt-practice_0.1.0_amd64.deb
-# or just double-click the .AppImage:
-chmod +x src-tauri/target/release/bundle/appimage/jlpt-practice_0.1.0_amd64.AppImage
-./src-tauri/target/release/bundle/appimage/jlpt-practice_0.1.0_amd64.AppImage
+./electron-release/"JLPT Practice-linux-x64"/"JLPT Practice"
 ```
 
-The app appears in your launcher as **JLPT Practice**.
+Or archive it for sharing / installing on another Pop!_OS machine:
 
-#### Install on Windows
+```bash
+tar czf JLPT-Practice-linux-x64.tar.gz -C electron-release "JLPT Practice-linux-x64"
+```
 
-Run the generated `.msi` (or `.exe`) from `src-tauri/target/release/bundle/`. The app is added to the Start menu as **JLPT Practice**.
+To install system-wide, drop the folder under `/opt/` and create a `.desktop` launcher pointing at the `JLPT Practice` binary inside it.
 
-> Tauri only builds installers for the OS you're running on. To produce a Windows `.msi` build it on Windows; for `.dmg` build on macOS.
+### Windows / macOS
+
+The `electron:build` script targets Linux by default. To build for other platforms, run `electron-packager` with a different `--platform` flag on a machine of that OS (Electron cross-compiles from Linux for `win32`/`darwin`, but code-signing and installer creation are host-OS specific):
+
+```bash
+bunx electron-packager . "JLPT Practice" --platform=win32 --arch=x64 --out=electron-release --overwrite --prune=true
+bunx electron-packager . "JLPT Practice" --platform=darwin --arch=arm64 --out=electron-release --overwrite --prune=true
+```
+
+For a proper `.msi` / `.dmg` installer you'll want `electron-builder` on Windows / macOS respectively.
 
 ---
 
 ## Releases via GitHub Actions (Linux)
 
-The repo ships with `.github/workflows/release.yml`, which builds Linux installers on GitHub's cloud runners and attaches them to a GitHub Release. Handy if you're developing on macOS/Windows but installing on Pop!_OS.
-
-**Trigger:** push a version tag matching `v*`.
+`.github/workflows/release.yml` builds a Linux Electron package on GitHub's cloud runners and attaches it to a GitHub Release. Push a `v*` tag to trigger it:
 
 ```bash
-# bump versions in package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml
+# bump "version" in package.json
 git tag v0.1.1
 git push origin v0.1.1
 ```
 
-The workflow runs on `ubuntu-22.04` (matches Pop!_OS 22.04's glibc), installs the Tauri system deps, runs `bun install` + `bun run build`, then uses `tauri-apps/tauri-action` to build and publish. When it finishes, the repo's **Releases** page has `.deb` and `.AppImage` files ready to download.
+The workflow runs on `ubuntu-22.04` (matches Pop!_OS 22.04's glibc), installs deps with `bun install`, runs `bun run build`, then packages with `electron-packager` and uploads a `JLPT-Practice-linux-x64.tar.gz` to the repo's **Releases** page.
 
-No secrets to configure — the workflow uses the auto-provisioned `GITHUB_TOKEN`. Make sure `src-tauri/icons/` is committed (run `bun tauri icon src-tauri/icons/icon.png` once locally) so the runner has platform icons to bundle.
+No secrets needed — the workflow uses the auto-provisioned `GITHUB_TOKEN`.
 
 ---
 
@@ -184,10 +151,11 @@ No secrets to configure — the workflow uses the auto-provisioned `GITHUB_TOKEN
 
 ```
 .
+├── electron/main.cjs           # Electron main process
 ├── public/quizzes/             # bundled question sets
 ├── src/
 │   ├── components/             # UI + shadcn primitives
-│   ├── lib/                    # quiz store, types, built-in quizzes
+│   ├── lib/                    # quiz store, types, built-in quizzes, MCP tools
 │   ├── routes/                 # TanStack Start file-based routes
 │   │   ├── __root.tsx          # app shell + sidebar
 │   │   ├── index.tsx           # Dashboard
@@ -196,23 +164,18 @@ No secrets to configure — the workflow uses the auto-provisioned `GITHUB_TOKEN
 │   │   ├── results.tsx         # Wrong / Correct / All tabs
 │   │   └── instructions.tsx
 │   └── styles.css              # Paper & Hanko design tokens
-└── src-tauri/                  # Rust + Tauri desktop shell
-    ├── tauri.conf.json
-    ├── Cargo.toml
-    ├── build.rs
-    ├── capabilities/default.json
-    └── src/main.rs
+└── .github/workflows/release.yml  # tag-triggered Linux Electron build
 ```
 
 ---
 
 ## Resetting progress
 
-Use **Reset all progress** at the bottom of the Dashboard, or clear the app's webview storage:
+Use **Reset all progress** at the bottom of the Dashboard, or clear Electron's per-app storage:
 
-- Linux: `~/.local/share/app.lovable.jlpt-practice/`
-- Windows: `%APPDATA%\app.lovable.jlpt-practice\`
-- macOS: `~/Library/Application Support/app.lovable.jlpt-practice/`
+- Linux: `~/.config/JLPT Practice/`
+- Windows: `%APPDATA%\JLPT Practice\`
+- macOS: `~/Library/Application Support/JLPT Practice/`
 
 ---
 
