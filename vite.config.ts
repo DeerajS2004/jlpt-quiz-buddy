@@ -13,6 +13,8 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Build a Node server output so Electron can spawn `.output/server/index.mjs` in production.
+  nitro: { preset: "node-server" },
   vite: {
     plugins: [mcpPlugin()],
   },
