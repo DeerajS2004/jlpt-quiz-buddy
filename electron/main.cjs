@@ -11,12 +11,12 @@ function startServer() {
     const packedServerPath = path.join(
       process.resourcesPath,
       "app.asar.unpacked",
-      "dist",
+      ".output",
       "server",
       "index.mjs"
     );
     // Unpacked development / local builds.
-    const devServerPath = path.join(__dirname, "..", "dist", "server", "index.mjs");
+    const devServerPath = path.join(__dirname, "..", ".output", "server", "index.mjs");
     const entry = require("fs").existsSync(packedServerPath) ? packedServerPath : devServerPath;
 
     // Use a random OS-assigned port so multiple instances don't collide.
