@@ -32,7 +32,7 @@ jobs:
       # if the lockfile wasn't generated to include every platform.
       - name: Install dependencies (Linux)
         if: matrix.name == 'linux'
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Install dependencies (Windows)
         if: matrix.name == 'windows'
