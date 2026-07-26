@@ -16,7 +16,7 @@ extraMetadata:
 asarUnpack:
   - .output/**/*
 linux:
-  icon: build-resources/icon.jpg
+  icon: build-resources/icon.png
   target:
     - target: AppImage
       arch:
@@ -24,7 +24,7 @@ linux:
   category: Education
   maintainer: JLPT Practice
 win:
-  icon: build-resources/icon.jpg
+  icon: build-resources/icon.png
   target:
     - target: nsis
       arch:
