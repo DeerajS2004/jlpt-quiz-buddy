@@ -1,17 +1,29 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, Play, FileJson } from "lucide-react";
+import { Upload, Play, FileJson, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { BUILT_IN_QUIZZES, fetchBuiltIn } from "@/lib/built-in-quizzes";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BUILT_IN_QUIZZES } from "@/lib/built-in-quizzes";
 import { saveActive, validateQuestionSet } from "@/lib/quiz-store";
-import type { QuestionSet } from "@/lib/quiz-types";
+import type { QuestionSet, QuestionType } from "@/lib/quiz-types";
+import { QUESTION_TYPES, TYPE_LABELS } from "@/lib/quiz-types";
+import { generateQuiz, loadApiKey, saveApiKey, type JlptLevel } from "@/lib/gemini-generate";
+
+const LEVELS: JlptLevel[] = ["N5", "N4", "N3", "N2", "N1"];
 
 export const Route = createFileRoute("/load")({
   head: () => ({
@@ -29,9 +41,58 @@ function LoadTest() {
   const [duration, setDuration] = useState(15); // minutes
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // AI generation state
+  const [apiKey, setApiKey] = useState("");
+  const [level, setLevel] = useState<JlptLevel>("N5");
+  const [categories, setCategories] = useState<QuestionType[]>(["kanji", "vocabulary"]);
+  const [count, setCount] = useState(15);
+  const [generating, setGenerating] = useState(false);
+
   useEffect(() => {
-    // preload first built-in to make Start instant
+    setApiKey(loadApiKey());
   }, []);
+
+  function toggleCategory(t: QuestionType) {
+    setCategories((prev) =>
+      prev.includes(t) ? prev.filter((c) => c !== t) : [...prev, t],
+    );
+  }
+
+  async function onGenerate() {
+    if (!apiKey.trim()) {
+      toast.error("Missing API key", { description: "Paste your Gemini API key first." });
+      return;
+    }
+    if (categories.length === 0) {
+      toast.error("Pick at least one category");
+      return;
+    }
+    saveApiKey(apiKey.trim());
+    setGenerating(true);
+    try {
+      const generated = await generateQuiz({
+        apiKey: apiKey.trim(),
+        level,
+        categories,
+        count,
+      });
+      const v = validateQuestionSet(generated);
+      if (!v.ok) {
+        toast.error("Generated set failed validation", { description: v.error });
+        return;
+      }
+      setSet(v.set);
+      toast.success("Quiz generated", {
+        description: `${v.set.title} · ${v.set.questions.length} questions`,
+      });
+    } catch (e) {
+      toast.error("Generation failed", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function onFile(file: File) {
     try {
@@ -142,6 +203,122 @@ function LoadTest() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6 border-hanko/30">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-hanko" />
+            <CardTitle className="font-display">Generate with Gemini 3.6 Flash</CardTitle>
+          </div>
+          <CardDescription>
+            Bring your own Google AI Studio API key. The key is stored only in this browser's
+            localStorage and used to call Google's Generative Language API directly.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <Label htmlFor="apiKey" className="text-xs uppercase tracking-wider text-muted-foreground">
+              Gemini API key
+            </Label>
+            <Input
+              id="apiKey"
+              type="password"
+              autoComplete="off"
+              placeholder="AIza..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="mt-2 font-mono text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Get one at{" "}
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="underline hover:text-hanko"
+              >
+                aistudio.google.com/apikey
+              </a>
+              .
+            </p>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                JLPT level
+              </Label>
+              <Select value={level} onValueChange={(v) => setLevel(v as JlptLevel)}>
+                <SelectTrigger className="mt-2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVELS.map((l) => (
+                    <SelectItem key={l} value={l}>
+                      JLPT {l}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+                Number of questions
+              </Label>
+              <div className="mt-3 flex items-center gap-4">
+                <Slider
+                  min={5}
+                  max={50}
+                  step={1}
+                  value={[count]}
+                  onValueChange={(v) => setCount(v[0] ?? 15)}
+                />
+                <div className="w-12 text-right font-display text-lg tabular-nums">{count}</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              Categories
+            </Label>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {QUESTION_TYPES.map((t) => {
+                const checked = categories.includes(t);
+                return (
+                  <label
+                    key={t}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm transition-colors hover:border-hanko/40"
+                  >
+                    <Checkbox checked={checked} onCheckedChange={() => toggleCategory(t)} />
+                    <span>{TYPE_LABELS[t]}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              onClick={onGenerate}
+              disabled={generating}
+              className="bg-hanko text-paper hover:bg-hanko/90"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" /> Generate quiz
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
 
       {set && (
         <Card className="mt-8 border-hanko/30">
