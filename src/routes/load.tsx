@@ -1,17 +1,29 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Upload, Play, FileJson } from "lucide-react";
+import { Upload, Play, FileJson, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { BUILT_IN_QUIZZES, fetchBuiltIn } from "@/lib/built-in-quizzes";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BUILT_IN_QUIZZES } from "@/lib/built-in-quizzes";
 import { saveActive, validateQuestionSet } from "@/lib/quiz-store";
-import type { QuestionSet } from "@/lib/quiz-types";
+import type { QuestionSet, QuestionType } from "@/lib/quiz-types";
+import { QUESTION_TYPES, TYPE_LABELS } from "@/lib/quiz-types";
+import { generateQuiz, loadApiKey, saveApiKey, type JlptLevel } from "@/lib/gemini-generate";
+
+const LEVELS: JlptLevel[] = ["N5", "N4", "N3", "N2", "N1"];
 
 export const Route = createFileRoute("/load")({
   head: () => ({
