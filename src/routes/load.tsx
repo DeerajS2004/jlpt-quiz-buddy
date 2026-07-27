@@ -41,9 +41,58 @@ function LoadTest() {
   const [duration, setDuration] = useState(15); // minutes
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // AI generation state
+  const [apiKey, setApiKey] = useState("");
+  const [level, setLevel] = useState<JlptLevel>("N5");
+  const [categories, setCategories] = useState<QuestionType[]>(["kanji", "vocabulary"]);
+  const [count, setCount] = useState(15);
+  const [generating, setGenerating] = useState(false);
+
   useEffect(() => {
-    // preload first built-in to make Start instant
+    setApiKey(loadApiKey());
   }, []);
+
+  function toggleCategory(t: QuestionType) {
+    setCategories((prev) =>
+      prev.includes(t) ? prev.filter((c) => c !== t) : [...prev, t],
+    );
+  }
+
+  async function onGenerate() {
+    if (!apiKey.trim()) {
+      toast.error("Missing API key", { description: "Paste your Gemini API key first." });
+      return;
+    }
+    if (categories.length === 0) {
+      toast.error("Pick at least one category");
+      return;
+    }
+    saveApiKey(apiKey.trim());
+    setGenerating(true);
+    try {
+      const generated = await generateQuiz({
+        apiKey: apiKey.trim(),
+        level,
+        categories,
+        count,
+      });
+      const v = validateQuestionSet(generated);
+      if (!v.ok) {
+        toast.error("Generated set failed validation", { description: v.error });
+        return;
+      }
+      setSet(v.set);
+      toast.success("Quiz generated", {
+        description: `${v.set.title} · ${v.set.questions.length} questions`,
+      });
+    } catch (e) {
+      toast.error("Generation failed", {
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function onFile(file: File) {
     try {
