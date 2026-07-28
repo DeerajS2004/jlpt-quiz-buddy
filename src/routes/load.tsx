@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useRef, useState } from "react";
 import { Upload, Play, FileJson, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,7 +22,8 @@ import { BUILT_IN_QUIZZES } from "@/lib/built-in-quizzes";
 import { saveActive, validateQuestionSet } from "@/lib/quiz-store";
 import type { QuestionSet, QuestionType } from "@/lib/quiz-types";
 import { QUESTION_TYPES, TYPE_LABELS } from "@/lib/quiz-types";
-import { generateQuiz, loadApiKey, saveApiKey, type JlptLevel } from "@/lib/gemini-generate";
+import { buildPerformanceSummary } from "@/lib/performance-summary";
+import { generateQuizFn, type JlptLevel } from "@/lib/gemini.functions";
 
 const LEVELS: JlptLevel[] = ["N5", "N4", "N3", "N2", "N1"];
 
@@ -42,21 +44,20 @@ function LoadTest() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // AI generation state
-  const [apiKey, setApiKey] = useState("");
   const [level, setLevel] = useState<JlptLevel>("N5");
   const [categories, setCategories] = useState<QuestionType[]>(["kanji", "vocabulary"]);
   const [count, setCount] = useState(15);
+  const [extraPrompt, setExtraPrompt] = useState("");
+  const [useHistory, setUseHistory] = useState(true);
   const [generating, setGenerating] = useState(false);
-
-  useEffect(() => {
-    setApiKey(loadApiKey());
-  }, []);
+  const generate = useServerFn(generateQuizFn);
 
   function toggleCategory(t: QuestionType) {
     setCategories((prev) =>
       prev.includes(t) ? prev.filter((c) => c !== t) : [...prev, t],
     );
   }
+
 
   async function onGenerate() {
     if (!apiKey.trim()) {
