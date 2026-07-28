@@ -210,37 +210,13 @@ function LoadTest() {
             <CardTitle className="font-display">Generate with Gemini 3.6 Flash</CardTitle>
           </div>
           <CardDescription>
-            Bring your own Google AI Studio API key. The key is stored only in this browser's
-            localStorage and used to call Google's Generative Language API directly.
+            Uses the <code className="font-mono text-xs">GEMINI_API_KEY</code> from your environment
+            — the key never touches the browser. Optionally steer the generation with your own
+            instructions and let it analyse your stats and past mistakes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div>
-            <Label htmlFor="apiKey" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Gemini API key
-            </Label>
-            <Input
-              id="apiKey"
-              type="password"
-              autoComplete="off"
-              placeholder="AIza..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="mt-2 font-mono text-sm"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Get one at{" "}
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-hanko"
-              >
-                aistudio.google.com/apikey
-              </a>
-              .
-            </p>
-          </div>
+
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
