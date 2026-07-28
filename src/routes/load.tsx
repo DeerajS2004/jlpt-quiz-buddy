@@ -58,25 +58,23 @@ function LoadTest() {
     );
   }
 
-
   async function onGenerate() {
-    if (!apiKey.trim()) {
-      toast.error("Missing API key", { description: "Paste your Gemini API key first." });
-      return;
-    }
     if (categories.length === 0) {
       toast.error("Pick at least one category");
       return;
     }
-    saveApiKey(apiKey.trim());
     setGenerating(true);
     try {
-      const generated = await generateQuiz({
-        apiKey: apiKey.trim(),
-        level,
-        categories,
-        count,
+      const generated = await generate({
+        data: {
+          level,
+          categories,
+          count,
+          extraPrompt: extraPrompt.trim() || undefined,
+          performance: useHistory ? buildPerformanceSummary() || undefined : undefined,
+        },
       });
+
       const v = validateQuestionSet(generated);
       if (!v.ok) {
         toast.error("Generated set failed validation", { description: v.error });
