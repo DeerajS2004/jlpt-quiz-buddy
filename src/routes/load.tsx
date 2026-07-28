@@ -274,6 +274,39 @@ function LoadTest() {
             </div>
           </div>
 
+          <div>
+            <Label
+              htmlFor="extraPrompt"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Extra instructions (optional)
+            </Label>
+            <Textarea
+              id="extraPrompt"
+              rows={3}
+              placeholder="e.g. focus on transitive/intransitive verb pairs, use workplace vocabulary, include one long reading passage…"
+              value={extraPrompt}
+              onChange={(e) => setExtraPrompt(e.target.value)}
+              className="mt-2 text-sm"
+            />
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border bg-muted/30 p-3 text-sm">
+            <Checkbox
+              checked={useHistory}
+              onCheckedChange={(v) => setUseHistory(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              Adapt to my performance
+              <span className="block text-xs text-muted-foreground">
+                Sends your lifetime stats, per-category accuracy and recently missed questions so
+                the model targets your weak points.
+              </span>
+            </span>
+          </label>
+
+
           <div className="flex justify-end">
             <Button
               onClick={onGenerate}
