@@ -1,26 +1,16 @@
 import type { QuestionSet, QuestionType } from "./quiz-types";
 
-const API_KEY_STORAGE = "jlpt.geminiApiKey";
 const MODEL = "gemini-3.6-flash";
-
-export function loadApiKey(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(API_KEY_STORAGE) ?? "";
-}
-
-export function saveApiKey(key: string) {
-  if (typeof window === "undefined") return;
-  if (key) localStorage.setItem(API_KEY_STORAGE, key);
-  else localStorage.removeItem(API_KEY_STORAGE);
-}
 
 export type JlptLevel = "N5" | "N4" | "N3" | "N2" | "N1";
 
-export interface GenerateParams {
-  apiKey: string;
+export interface GenerateInput {
   level: JlptLevel;
   categories: QuestionType[];
   count: number;
+  extraPrompt?: string;
+  /** Pre-formatted summary of the learner's stats + recent mistakes. */
+  performance?: string;
 }
 
 const RESPONSE_SCHEMA = {
@@ -47,8 +37,11 @@ const RESPONSE_SCHEMA = {
   required: ["title", "questions"],
 };
 
-export async function generateQuiz(params: GenerateParams): Promise<QuestionSet> {
-  const { apiKey, level, categories, count } = params;
+export async function generateQuizWithGemini(
+  apiKey: string,
+  params: GenerateInput,
+): Promise<QuestionSet> {
+  const { level, categories, count, extraPrompt, performance } = params;
 
   const prompt = `Generate exactly ${count} unique JLPT ${level} practice questions.
 Categories to draw from: ${categories.join(", ")}.
@@ -65,7 +58,26 @@ Rules:
 - "explanation" must be a concise English explanation of why the answer is correct.
 - Distribute questions roughly evenly across the requested categories.
 - Return valid JSON only, matching the schema.
+${
+  performance
+    ? `
+LEARNER PERFORMANCE DATA (analyse this before writing questions):
+${performance}
 
+Use this data to target the learner's weak points: weight questions toward the
+categories with the lowest accuracy, re-test (in reworded form, never verbatim)
+the concepts they answered incorrectly, and avoid over-drilling what they
+already answer correctly. Keep everything within JLPT ${level}.
+`
+    : ""
+}${
+    extraPrompt?.trim()
+      ? `
+ADDITIONAL USER INSTRUCTIONS (follow these unless they conflict with the rules above):
+${extraPrompt.trim()}
+`
+      : ""
+  }
 Set the title to "JLPT ${level} — AI Generated (${count}q)".`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;

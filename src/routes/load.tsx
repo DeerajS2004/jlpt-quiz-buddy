@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useRef, useState } from "react";
 import { Upload, Play, FileJson, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,7 +22,8 @@ import { BUILT_IN_QUIZZES } from "@/lib/built-in-quizzes";
 import { saveActive, validateQuestionSet } from "@/lib/quiz-store";
 import type { QuestionSet, QuestionType } from "@/lib/quiz-types";
 import { QUESTION_TYPES, TYPE_LABELS } from "@/lib/quiz-types";
-import { generateQuiz, loadApiKey, saveApiKey, type JlptLevel } from "@/lib/gemini-generate";
+import { buildPerformanceSummary } from "@/lib/performance-summary";
+import { generateQuizFn, type JlptLevel } from "@/lib/gemini.functions";
 
 const LEVELS: JlptLevel[] = ["N5", "N4", "N3", "N2", "N1"];
 
@@ -42,15 +44,13 @@ function LoadTest() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   // AI generation state
-  const [apiKey, setApiKey] = useState("");
   const [level, setLevel] = useState<JlptLevel>("N5");
   const [categories, setCategories] = useState<QuestionType[]>(["kanji", "vocabulary"]);
   const [count, setCount] = useState(15);
+  const [extraPrompt, setExtraPrompt] = useState("");
+  const [useHistory, setUseHistory] = useState(true);
   const [generating, setGenerating] = useState(false);
-
-  useEffect(() => {
-    setApiKey(loadApiKey());
-  }, []);
+  const generate = useServerFn(generateQuizFn);
 
   function toggleCategory(t: QuestionType) {
     setCategories((prev) =>
@@ -59,23 +59,22 @@ function LoadTest() {
   }
 
   async function onGenerate() {
-    if (!apiKey.trim()) {
-      toast.error("Missing API key", { description: "Paste your Gemini API key first." });
-      return;
-    }
     if (categories.length === 0) {
       toast.error("Pick at least one category");
       return;
     }
-    saveApiKey(apiKey.trim());
     setGenerating(true);
     try {
-      const generated = await generateQuiz({
-        apiKey: apiKey.trim(),
-        level,
-        categories,
-        count,
+      const generated = await generate({
+        data: {
+          level,
+          categories,
+          count,
+          extraPrompt: extraPrompt.trim() || undefined,
+          performance: useHistory ? buildPerformanceSummary() || undefined : undefined,
+        },
       });
+
       const v = validateQuestionSet(generated);
       if (!v.ok) {
         toast.error("Generated set failed validation", { description: v.error });
@@ -211,37 +210,13 @@ function LoadTest() {
             <CardTitle className="font-display">Generate with Gemini 3.6 Flash</CardTitle>
           </div>
           <CardDescription>
-            Bring your own Google AI Studio API key. The key is stored only in this browser's
-            localStorage and used to call Google's Generative Language API directly.
+            Uses the <code className="font-mono text-xs">GEMINI_API_KEY</code> from your environment
+            — the key never touches the browser. Optionally steer the generation with your own
+            instructions and let it analyse your stats and past mistakes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div>
-            <Label htmlFor="apiKey" className="text-xs uppercase tracking-wider text-muted-foreground">
-              Gemini API key
-            </Label>
-            <Input
-              id="apiKey"
-              type="password"
-              autoComplete="off"
-              placeholder="AIza..."
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="mt-2 font-mono text-sm"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Get one at{" "}
-              <a
-                href="https://aistudio.google.com/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="underline hover:text-hanko"
-              >
-                aistudio.google.com/apikey
-              </a>
-              .
-            </p>
-          </div>
+
 
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
@@ -298,6 +273,39 @@ function LoadTest() {
               })}
             </div>
           </div>
+
+          <div>
+            <Label
+              htmlFor="extraPrompt"
+              className="text-xs uppercase tracking-wider text-muted-foreground"
+            >
+              Extra instructions (optional)
+            </Label>
+            <Textarea
+              id="extraPrompt"
+              rows={3}
+              placeholder="e.g. focus on transitive/intransitive verb pairs, use workplace vocabulary, include one long reading passage…"
+              value={extraPrompt}
+              onChange={(e) => setExtraPrompt(e.target.value)}
+              className="mt-2 text-sm"
+            />
+          </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border bg-muted/30 p-3 text-sm">
+            <Checkbox
+              checked={useHistory}
+              onCheckedChange={(v) => setUseHistory(v === true)}
+              className="mt-0.5"
+            />
+            <span>
+              Adapt to my performance
+              <span className="block text-xs text-muted-foreground">
+                Sends your lifetime stats, per-category accuracy and recently missed questions so
+                the model targets your weak points.
+              </span>
+            </span>
+          </label>
+
 
           <div className="flex justify-end">
             <Button
